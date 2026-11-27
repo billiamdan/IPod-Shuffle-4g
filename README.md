@@ -1,146 +1,196 @@
-# IPod Shuffle 4g Script
+# Shuffler
 
-## ipod-shuffle-4g.py
+A native macOS app for the iPod shuffle (3rd and 4th generation): copy music onto it, manage its
+playlists, and give every song and playlist a spoken name for the VoiceOver button.
 
-Python script for building the Track and Playlist database for the newer gen IPod Shuffle.
-Forked from the [shuffle-db-ng project](https://code.google.com/p/shuffle-db-ng/)
-and improved my nims11 and NicoHood.
+It replaces the Python script this repository started as (still here, see
+[Legacy script](#legacy-script)) and needs nothing installed besides macOS 14 or later.
 
-Just put your audio files into the mass storage of your IPod and shuffle.py will do the rest.
+## What it does
+
+- **Adds music** by drag and drop or from a file dialog: MP3, AAC, Apple Lossless and WAV go over
+  without re-encoding. AIFF, FLAC and anything high-resolution is converted to something the iPod
+  plays, using the encoders built into macOS.
+- **Manages playlists**: create, rename, delete, fill by dragging, reorder. "All Songs" can be
+  reordered and sorted too.
+- **Records VoiceOver announcements** with the voices that ship with macOS, in the layout Apple's
+  own recordings on the iPod use. Titles in another alphabet are spoken with a matching voice.
+  Wording and language can be set per song.
+- **Per-song playback options** the iPod supports: remember the playback position (useful for long
+  mixes and audiobooks) and skip when shuffling.
+- **Reads what is already there**: music synced earlier by Finder keeps its titles, playlists and
+  recordings.
+- **Keeps Finder in the picture**: Finder lists an iPod's songs from a second file on it, Apple's
+  library file. Shuffler updates that file along with the play database, so a song removed or added
+  here is removed or added there too.
+- **Is careful with the device**: an iPod it has not changed before is only read until you change
+  something; the files about to be replaced are copied to the Mac before the first change of a
+  session; each is replaced in one step and checked afterwards.
+
+## Install
+
+Build the disk image (see below), open `dist/Shuffler-<version>.dmg` and drag Shuffler to
+Applications. The first time it sees the iPod, macOS asks whether the app may access files on a
+removable volume.
+
+An image built this way is signed for the Mac that built it. To hand it to other people it has to be
+signed with a Developer ID and notarized; `scripts/build-app.sh` does both when given the identity.
+
+## Build
+
+Requires a Swift 6 toolchain (developed with Xcode 27).
+
+```bash
+swift test                # no iPod needed
+```
+
+```bash
+scripts/build-app.sh      # dist/Shuffler.app and dist/Shuffler-2.0.0.dmg
+```
+
+Settings for the build script are environment variables: `VERSION`, `ARCHS` (default
+`"arm64 x86_64"`), `SIGN_IDENTITY` (default ad-hoc), `NOTARY_PROFILE`, `BUNDLE_ID`.
+
+## Using the app
+
+Connect the iPod; it appears on its own. The sidebar lists "All Songs" and the playlists, the table
+shows songs in the order the iPod plays them, and the panel on the right (toolbar button, or
+double-click a song) shows details of the selection.
+
+- Drag songs or folders from Finder onto the list, or onto a playlist in the sidebar.
+- Drag rows to reorder them; drag them onto a playlist to add them.
+- Delete removes songs from a playlist. In "All Songs" it removes them from the iPod, after asking.
+- Changes are written a moment after you make them. The status bar says when everything is saved.
+- Use the Eject button (or ⌘E) before unplugging.
+
+VoiceOver language, voice and wording are in Settings; so is what to do with lossless music, which
+is large for a 2 GB player.
+
+## Command line
+
+The app bundle carries the same engine as a terminal tool:
+`Shuffler.app/Contents/MacOS/shufflectl` (or `swift run shufflectl`).
+
+```
+shufflectl devices
+shufflectl info
+shufflectl list [--playlist NAME]
+shufflectl add FILE|FOLDER... [--playlist NAME] [--lossless keep|alac|aac]
+shufflectl remove TRACK...
+shufflectl set TRACK [--title T] [--artist A] [--say TEXT] [--language TAG] [--remember on|off] [--skip-shuffle on|off]
+shufflectl playlist create|delete|rename|add|remove ...
+shufflectl voiceover on|off|rebuild
+shufflectl sync
+shufflectl check
+shufflectl cleanup [--yes]
+shufflectl dump
+```
+
+`--device PATH` selects an iPod when several are connected, or points at a folder laid out like one.
+`sync` writes what is pending without changing anything else: plays the iPod recorded, and Finder's
+list of songs if it has fallen behind. `check` says whether there is anything of the kind.
+
+## How it works
+
+The iPod's firmware plays from one small binary file, `iPod_Control/iTunes/iTunesSD`. It lists the
+tracks (path, a type code that selects the decoder, playback options) and the playlists, and
+contains no text at all: names exist only as recordings in `iPod_Control/Speakable`. The format is
+described in [docs/iTunesSD3gen.md](docs/iTunesSD3gen.md); the layout Apple's current sync writes
+differs slightly and is documented in
+[ShuffleDatabase.swift](Sources/ShuffleKit/Database/ShuffleDatabase.swift).
+
+Next to it lies `iTunesDB`, the library file of Apple's own software: titles, albums, playlists by
+name, play counts. The iPod never reads it, but Finder does, and lists the iPod's songs from it.
+Shuffler edits it in place rather than rebuilding it: records of removed songs go, songs and playlists
+made here get records shaped like the ones Apple wrote, and everything else stays byte for byte as it
+was. The file is only touched if it can be read completely and written back identically first; the
+layout is described in [AppleLibraryFile.swift](Sources/ShuffleKit/Library/AppleLibraryFile.swift)
+and [AppleLibraryMirror.swift](Sources/ShuffleKit/Library/AppleLibraryMirror.swift).
+
+| On the iPod | Purpose | Shuffler |
+|---|---|---|
+| `iPod_Control/iTunes/iTunesSD` | play database | reads and writes |
+| `iPod_Control/iTunes/iTunesStats` | play counts and resume positions, written by the iPod | reads, then resets |
+| `iPod_Control/iTunes/iTunesDB` | Apple's library file, which Finder shows | reads titles from it; keeps it in step |
+| `iPod_Control/Music/F00`–`F02` | the music, under short names | adds and removes files |
+| `iPod_Control/Speakable/Tracks`, `Playlists` | announcements | adds and removes recordings |
+| `iPod_Control/Speakable/Messages`, `System` | system prompts ("Battery low") | leaves alone |
+| `iPod_Control/Shuffler/library.json` | titles, playlist names, what was last written | its own notes |
+
+Backups of both databases go to `~/Library/Application Support/Shuffler/Backups` (iPod menu ▸ Show
+Backups in Finder), the last 20 per iPod.
+
+## Good to know
+
+- **Finder sees what Shuffler did, but its sync still follows the Mac's music library.** A sync
+  from Finder makes the iPod match what is ticked there: a song removed here comes back if it is
+  still selected in Finder, and one added here may be taken off again. Shuffler notices, reloads,
+  and keeps what it knew about songs that are still there; files left belonging to nothing can be
+  cleared with iPod menu ▸ Remove Unused Files. Turning off automatic syncing for the iPod in
+  Finder avoids surprises.
+- **Finder reads the iPod when it is connected.** A change made here shows in Finder after the iPod
+  has been ejected and connected again.
+- **Apple's library file is updated, never invented.** An iPod that has none (it was never synced by
+  Apple's software) does not get one, and a file Shuffler cannot reproduce exactly is left as it is;
+  `shufflectl check` says so. The iPod plays the same either way.
+- **An iPod Shuffler already changed is brought in line on opening.** Earlier builds left Apple's
+  file alone, so Finder kept listing removed songs. Opening such an iPod now corrects the file once,
+  after a backup. An iPod Shuffler has never written is not touched until you change something.
+- **Podcast and audiobook lists** from Apple's sync are shown as ordinary playlists.
+- **System prompts** stay in the language they were installed in.
+- **Copy-protected purchases** cannot be added; only Apple's sync can authorise an iPod for them.
+
+## Development
+
+```
+Sources/ShuffleKit   everything that touches the iPod; no UI (database codec, import, VoiceOver, sync)
+Sources/Shuffler     the SwiftUI app
+Sources/shufflectl   the terminal tool
+Tests/               tests, including fixtures of real databases and of Apple's library file
+scripts/             app bundle, disk image and icon
+```
+
+A folder can stand in for an iPod, which is how everything is tested without the device:
+
+```bash
+SHUFFLER_DEVICE=/path/to/folder-with-iPod_Control swift run Shuffler
+```
+
+`SHUFFLER_SNAPSHOT=/tmp/window.png` makes the app draw its windows into PNG files and quit (see
+[Snapshot.swift](Sources/Shuffler/Support/Snapshot.swift)); `SHUFFLER_BACKUP_DIR` redirects backups.
+
+## Legacy script
+
+`ipod-shuffle-4g.py` is the original command-line script (Python 3, optional
+[Mutagen](https://mutagen.readthedocs.io)). It rebuilds the database from whatever files are already
+on the iPod and is kept for Linux users:
+
 ```
 $ ./ipod-shuffle-4g.py --help
 usage: ipod-shuffle-4g.py [-h] [-t] [-p] [-u] [-g TRACK_GAIN]
                           [-d [AUTO_DIR_PLAYLISTS]] [-i [ID3_TEMPLATE]] [-v]
                           path
-
-Python script for building the Track and Playlist database for the newer gen
-IPod Shuffle. Version 1.5
-
-positional arguments:
-  path                  Path to the IPod's root directory
-
-optional arguments:
-  -h, --help            show this help message and exit
-  -t, --track-voiceover
-                        Enable track voiceover feature
-  -p, --playlist-voiceover
-                        Enable playlist voiceover feature
-  -u, --rename-unicode  Rename files causing unicode errors, will do minimal
-                        required renaming
-  -g TRACK_GAIN, --track-gain TRACK_GAIN
-                        Specify volume gain (0-99) for all tracks; 0 (default)
-                        means no gain and is usually fine; e.g. 60 is very
-                        loud even on minimal player volume
-  -d [AUTO_DIR_PLAYLISTS], --auto-dir-playlists [AUTO_DIR_PLAYLISTS]
-                        Generate automatic playlists for each folder
-                        recursively inside "IPod_Control/Music/". You can
-                        optionally limit the depth: 0=root, 1=artist, 2=album,
-                        n=subfoldername, default=-1 (No Limit).
-  -i [ID3_TEMPLATE], --auto-id3-playlists [ID3_TEMPLATE]
-                        Generate automatic playlists based on the id3 tags of
-                        any music added to the iPod. You can optionally
-                        specify a template string based on which id3 tags are
-                        used to generate playlists. For eg. '{artist} -
-                        {album}' will use the pair of artist and album to
-                        group tracks under one playlist. Similarly '{genre}'
-                        will group tracks based on their genre tag. Default
-                        template used is '{artist}'
-  -v, --verbose         Show verbose output of database generation.
 ```
 
-#### Dependencies
+Two things it gets wrong that the new code does not: WAV files are given the MP3 type code, so the
+iPod stays silent for them, and paths longer than 256 bytes are cut off without warning.
 
-This script requires:
-* [Python 3](https://www.python.org/download/releases/3.0/)
+Its tips still apply when the iPod is managed from Linux:
 
-Optional album/artist and auto-id3-playlists support:
-* [Mutagen](https://code.google.com/p/mutagen/)
+- **Disable the trash**: an empty file named `.Trash-1000` in the iPod's root makes Linux delete
+  files instead of moving them to a trash folder ([extras](extras)).
+- **Rhythmbox**: put [extras/.is_audio_player](extras/.is_audio_player) in the iPod's root, disable
+  Rhythmbox's iPod plugin and enable its MTP plugin; the script then picks up the `.pls` playlists
+  Rhythmbox writes.
+- **Reformatting**: the iPod has no partition table; create the FAT file system directly on the
+  device (`sudo mkfs.vfat -I -F 16 -n IPOD /dev/sdX`), then rebuild the database.
 
-Optional Voiceover support
-* [eSpeak](http://espeak.sourceforge.net/)
-* [PicoSpeaker](http://picospeaker.tk/readme.php)
-* [RHVoice (master branch, 3e31edced402a08771d2c48c73213982cbe9333e)](https://github.com/Olga-Yakovleva/RHVoice) -- (Russian files only)
-* [SoX](http://sox.sourceforge.net) -- (Russian files)
-* say (macOS)
+## Credits and further reading
 
-##### Ubuntu
+Forked from the [shuffle-db-ng project](https://code.google.com/p/shuffle-db-ng/), improved by
+nims11 and NicoHood. Licensed under the GPL, version 2 ([COPYING](COPYING)).
 
-`apt-get install python3 python-mutagen libttspico*`
-
-##### Arch Linux
-
-From the **Extra** repository: `pacman -S python` and optional `pacman -S python-mutagen espeak` or from the AUR: `svox-pico-bin` ([link](https://aur.archlinux.org/packages/svox-pico-bin/))
-
-You can also [install the script from AUR](https://aur.archlinux.org/packages/ipod-shuffle-4g/).
-
-##### Gentoo Linux
-
-```bash
-PYTHON_TARGETS="python3" emerge -av media-libs/mutagen
-layman --add=ikelos
-layman --overlays="https://raw.githubusercontent.com/ahippo/rhvoice-gentoo-overlay/master/repositories.xml" --fetch --add=ahippo-rhvoice-overlay
-ACCEPT_KEYWORDS="~amd64" emerge -av app-accessibility/svox app-accessibility/rhvoice
-```
-References to the overlays above: [ikelos](http://git.overlays.gentoo.org/gitweb/?p=dev/ikelos.git;a=summary), [ahippo-rhvoice-overlay](https://github.com/ahippo/rhvoice-gentoo-overlay)
-
-## Tips and Tricks
-
-#### Disable trash for IPod
-To avoid that linux moves deleted files into trash you can create an empty file `.Trash-1000`.
-This forces linux to delete the files permanently instead of moving them to the trash.
-Of course you can also use `shift + delete` to permanently delete files without this trick.
-The file can be found in the [extras](extras) folder.
-
-#### Compress/Convert your music files
-([#11](https://github.com/nims11/IPod-Shuffle-4g/issues/11)) Shuffle is short on storage, and you might want to squeeze in more of your collection by sacrificing some bitrate off your files. In rarer cases, you might also possess music in formats not supported by your ipod. Although `ffmpeg` can handle almost all your needs, if you are looking for a friendly alternative, try [Soundconverter](http://soundconverter.org/).
-
-#### Use Rhythmbox to manage your music and playlists
-As described [in the blog post](https://nims11.wordpress.com/2013/10/12/ipod-shuffle-4g-under-linux/)
-you can use Rythmbox to sync your personal music library to your IPod
-but still make use of the additional features this script provides (such as voiceover).
-
-Simply place a file called `.is_audio_player` into the root directory of your IPod and add the following content:
-```
-name=&quot;Name's IPOD&quot;
-audio_folders=iPod_Control/Music/
-```
-The file can be found in the [extras](extras) folder.
-
-Now disable the IPod plugin of Rhythmbox and enable the MTP plugin instead.
-You can use Rythmbox now to generate playlists and sync them to your IPod.
-The script will recognize the .pls playlists and generate a proper iTunesSD file.
-
-##### Known Rhythmbox syncing issues
-* Creating playlists with names like `K.I.Z.` will fail, because the FAT Filesystem does not support a dot `.` at the end of a directory/file.
-* Sometimes bad ID3 tags can also cause corrupted playlists.
-
-In all cases you can try to update Rythmbox to the latest version, sync again or fix the wrong filenames yourself.
-
-#### Carry the script with your IPod
-If you want to use this script on different computers it makes sense
-to simply copy the script into the IPod's root directory.
-
-#### Format/Restore/Recover IPod
-([#41](https://github.com/nims11/IPod-Shuffle-4g/issues/41)) If you formatted your IPod wrong and lost all data you can still recover it.
-It is important to **not use MBR/GPT**. You need to directly create a **Fat16 Filesystem**:
-
-```bash
-sudo mkfs.vfat -I -F 16 -n IPOD /dev/sdX
-```
-
-Run this script to generate the new database. All missing sound files should be regenrated by the IPod on next use.
-Your IPod should work and play music again now.
-
-## TODO
-* Last.fm Scrobbler
-* Qt frontend
-
-## EXTRA READING
-* [shuffle3db specification](docs/iTunesSD3gen.md)
-* [Using shuffle.py and Rhythmbox for easy syncing of playlists and songs](http://nims11.wordpress.com/2013/10/12/ipod-shuffle-4g-under-linux/)
-* [gtkpod](http://www.gtkpod.org/wiki/Home)
-* [German Ubuntu IPod tutorial](https://wiki.ubuntuusers.de/iPod/)
-* [IPod management apps](https://wiki.archlinux.org/index.php/IPod#iPod_management_apps)
-
-The original shuffle3db website went offline. This repository contains a copy of the information inside the `docs` folder.
-Original data can be found via [wayback machine](https://web.archive.org/web/20131016014401/http://shuffle3db.wikispaces.com/iTunesSD3gen).
+- [shuffle3db specification](docs/iTunesSD3gen.md) and [iTunesStats](docs/iTunesStats3gen.md)
+  (copies of the vanished wiki; [original via the Wayback Machine](https://web.archive.org/web/20131016014401/http://shuffle3db.wikispaces.com/iTunesSD3gen))
+- [gtkpod](http://www.gtkpod.org/wiki/Home) and libgpod, the reference implementation on Linux
+- [iPod management apps (Arch wiki)](https://wiki.archlinux.org/index.php/IPod#iPod_management_apps)
