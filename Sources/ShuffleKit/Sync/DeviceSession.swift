@@ -57,8 +57,23 @@ public struct CommitSummary: Sendable, Equatable {
     public var announcementsRecorded = 0
     public var announcementsFailed = 0
     public var filesRemoved = 0
+    /// Apple's library file, which Finder lists the iPod's songs from, was brought in step.
+    public var appleLibraryWritten = false
+    /// Why Apple's library file could not be brought in step, when it could not. The iPod plays regardless.
+    public var appleLibraryProblem: String?
     /// Where the previous database was copied before the first change of this session.
     public var backup: URL?
+}
+
+/// How Apple's library file (`iTunesDB`) stands next to what is on the iPod.
+public enum AppleLibraryStatus: Sendable, Equatable {
+    /// The iPod has no such file, so there is nothing to keep in step.
+    case absent
+    case inStep
+    /// The file lists other songs or playlists than the iPod holds. The next commit corrects that.
+    case behind(AppleLibraryChanges)
+    /// The file cannot be read, or is built in a way this app does not edit. It is left alone.
+    case unreadable(String)
 }
 
 public struct UnusedFile: Sendable, Identifiable, Equatable {
@@ -102,6 +117,12 @@ public actor DeviceSession {
     private var deviceTrackIDs: [UInt64] = []
     private var statisticsNeedReset = false
     private var pendingRemovals: [URL] = []
+    /// Plays and skips taken over from the iPod that Apple's library file has not been told about yet.
+    private var unreportedActivity: [UInt64: PlayActivity] = [:]
+    /// Playlists deleted here that may still have a record in Apple's library file.
+    private var deletedPlaylists = Set<UInt64>()
+    /// True when the library came from this app's own notes, which means this app wrote the iPod last.
+    private var openedFromManifest = false
     private var backupURL: URL?
     private let speech: any SpeechProvider
     private let backupRoot: URL
@@ -144,14 +165,18 @@ public actor DeviceSession {
                 manifest.removeTracks(Set(lost.map(\.id)))
             }
             library = manifest
+            openedFromManifest = true
         } else {
             library = try await DeviceImporter.importLibrary(from: device, previous: manifest) { url in
                 try? await MediaProbe.probe(url).tags
             }
+            openedFromManifest = false
         }
         expectedDigest = digest
         deviceTrackIDs = databaseData == nil ? [] : library.tracks.map(\.id)
         pendingRemovals = []
+        unreportedActivity = [:]
+        deletedPlaylists = []
         statisticsNeedReset = mergeStatistics()
         baseline = library
         return library
@@ -184,6 +209,7 @@ public actor DeviceSession {
     public func removePlaylist(_ id: UInt64) -> Library {
         guard library.playlists.contains(where: { $0.id == id }) else { return library }
         pendingRemovals.append(device.playlistAnnouncementURL(id: id))
+        deletedPlaylists.insert(id)
         library.playlists.removeAll { $0.id == id }
         return library
     }
@@ -374,8 +400,8 @@ public actor DeviceSession {
     // MARK: Committing
 
     /// Makes the iPod match the library: records missing or outdated announcements, replaces the
-    /// database, resets the play statistics, deletes files of removed tracks and saves the manifest.
-    /// Does nothing at all when nothing changed.
+    /// database, resets the play statistics, brings Apple's library file in step, deletes files of
+    /// removed tracks and saves the manifest. Does nothing at all when nothing changed.
     @discardableResult
     public func commit(
         voiceOver settings: VoiceOverSettings, progress: (@Sendable (CommitProgress) -> Void)? = nil
@@ -414,6 +440,11 @@ public actor DeviceSession {
         }
         deviceTrackIDs = library.tracks.map(\.id)
 
+        // A playlist can also disappear through `edit`; whichever way it went, its record should go too.
+        deletedPlaylists.formUnion(baseline.playlists.map(\.id))
+        deletedPlaylists.subtract(library.playlists.map(\.id))
+        updateAppleLibrary(&summary)
+
         progress?(.finishing)
         // The database no longer mentions these, so they can go. Anything still referenced stays.
         let stillUsed = Set(library.tracks.map { device.fileURL(devicePath: $0.record.path).path.lowercased() })
@@ -435,11 +466,62 @@ public actor DeviceSession {
         return summary
     }
 
+    // MARK: Apple's library file
+
+    /// Rewrites Apple's library file when it lists something else than the library does. A failure here
+    /// is reported, not thrown: the iPod plays from the database, which is already in place.
+    private func updateAppleLibrary(_ summary: inout CommitSummary) {
+        guard let current = try? Data(contentsOf: device.appleLibraryURL) else {
+            deletedPlaylists = []
+            unreportedActivity = [:]
+            return
+        }
+        do {
+            let updated = try AppleLibraryMirror.mirror(
+                current, to: library, removedPlaylists: deletedPlaylists, activity: unreportedActivity
+            ).data
+            if updated != current {
+                try backupIfNeeded()
+                try FileOps.atomicWrite(updated, to: device.appleLibraryURL)
+                guard (try? Data(contentsOf: device.appleLibraryURL)) == updated else { throw SessionError.verificationFailed }
+                summary.appleLibraryWritten = true
+            }
+            deletedPlaylists = []
+            unreportedActivity = [:]
+        } catch {
+            summary.appleLibraryProblem = Self.describe(error)
+        }
+    }
+
+    /// Compares Apple's library file with the library as it stands, pending edits included. Reads only.
+    public func appleLibraryStatus() -> AppleLibraryStatus {
+        guard let current = try? Data(contentsOf: device.appleLibraryURL) else { return .absent }
+        do {
+            let result = try AppleLibraryMirror.mirror(current, to: library, removedPlaylists: deletedPlaylists)
+            return result.data == current ? .inStep : .behind(result.changes)
+        } catch {
+            return .unreadable(Self.describe(error))
+        }
+    }
+
+    /// True when this app wrote the iPod last and left Apple's library file behind, as its first builds
+    /// always did. Catching up is then unfinished business of this app rather than a new change, so the
+    /// app does it on opening. On an iPod this app has not written, nothing happens unasked.
+    public func appleLibraryNeedsCatchUp() -> Bool {
+        guard openedFromManifest, case .behind = appleLibraryStatus() else { return false }
+        return true
+    }
+
     /// Adds what the iPod recorded since the last sync to the library. Returns whether there was anything.
     private func mergeStatistics() -> Bool {
         guard let data = try? Data(contentsOf: device.statisticsURL), let statistics = try? PlayStatistics(data: data),
               statistics.hasActivity, statistics.entries.count == deviceTrackIDs.count else { return false }
         for (index, entry) in statistics.entries.enumerated() where !entry.isEmpty {
+            if entry.playCount > 0 || entry.skipCount > 0 {
+                unreportedActivity[deviceTrackIDs[index]] = PlayActivity(
+                    plays: entry.playCount, skips: entry.skipCount, lastPlayed: entry.lastPlayed, lastSkipped: entry.lastSkipped
+                )
+            }
             library.update(trackID: deviceTrackIDs[index]) { track in
                 track.playCount += Int(entry.playCount)
                 track.skipCount += Int(entry.skipCount)
@@ -532,7 +614,8 @@ public actor DeviceSession {
     private func backupIfNeeded() throws {
         guard backupURL == nil else { return }
         let playState = device.databaseDirectory.appendingPathComponent("iTunesPState")
-        let sources = [device.databaseURL, device.statisticsURL, playState, device.manifestURL].filter(FileOps.exists)
+        let sources = [device.databaseURL, device.statisticsURL, playState, device.appleLibraryURL, device.manifestURL]
+            .filter(FileOps.exists)
         guard !sources.isEmpty else { return }
 
         let formatter = DateFormatter()
@@ -588,6 +671,14 @@ public actor DeviceSession {
         }
         if data.count != (try? database.encoded().count) {
             problems.append("the database has an unusual structure (it would be rewritten differently)")
+        }
+        switch appleLibraryStatus() {
+        case .absent, .inStep:
+            break
+        case let .behind(changes):
+            problems.append("Apple's library file, which Finder shows, is out of step: \(changes.pendingSummary)")
+        case let .unreadable(reason):
+            problems.append("Apple's library file, which Finder shows, cannot be kept in step: \(reason)")
         }
         return problems
     }

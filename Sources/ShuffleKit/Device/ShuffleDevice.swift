@@ -18,7 +18,7 @@ public struct ShuffleDevice: Sendable, Hashable, Identifiable {
     public var databaseURL: URL { databaseDirectory.appendingPathComponent("iTunesSD") }
     /// Play counts and bookmarks, written by the iPod.
     public var statisticsURL: URL { databaseDirectory.appendingPathComponent("iTunesStats") }
-    /// Apple's own library file. Read for titles, never written.
+    /// Apple's own library file, which Finder lists the iPod's songs from. Read for titles; kept in step on commit.
     public var appleLibraryURL: URL { databaseDirectory.appendingPathComponent("iTunesDB") }
     public var musicDirectory: URL { controlDirectory.appendingPathComponent("Music", isDirectory: true) }
     public var speakableDirectory: URL { controlDirectory.appendingPathComponent("Speakable", isDirectory: true) }

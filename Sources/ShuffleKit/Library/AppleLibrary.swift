@@ -1,10 +1,11 @@
 import Foundation
 
-/// A minimal reader for Apple's `iTunesDB`, the library file Apple's sync keeps next to the play database.
+/// A forgiving reader for Apple's `iTunesDB`, the library file Apple's sync keeps next to the play database.
 ///
 /// The play database has no text in it, so this is where titles and playlist names of music that
-/// was synced by Apple's software come from. Only read, never written. Anything unexpected in the
-/// file simply ends the scan: the result holds whatever was understood up to that point.
+/// was synced by Apple's software come from. Anything unexpected in the file simply ends the scan:
+/// the result holds whatever was understood up to that point. Changing the file is the business of
+/// `AppleLibraryMirror`, which reads it strictly instead (see `AppleLibraryFile` for the layout).
 public struct AppleLibrary: Sendable, Equatable {
     public struct TrackInfo: Sendable, Equatable {
         public var title = ""
@@ -13,16 +14,25 @@ public struct AppleLibrary: Sendable, Equatable {
         public var genre = ""
         public var trackNumber = 0
         public var durationMs = 0
+        public var playCount = 0
+        public var skipCount = 0
+        public var lastPlayed: Date?
+        public var dateAdded: Date?
     }
 
     /// Keyed by the same 64-bit ID the play database uses.
     public private(set) var tracks: [UInt64: TrackInfo] = [:]
     public private(set) var playlistNames: [UInt64: String] = [:]
+    /// The file's dates are on the clock of the Mac that wrote it; this is that clock's distance from Greenwich.
+    private var zone = TimeZone.current
 
     public init(data: Data) {
         let reader = ByteReader(data)
         do {
             guard try reader.tag(0) == "mhbd" else { return }
+            if Int(try reader.u32(4)) >= 112, let stored = TimeZone(secondsFromGMT: Int(Int32(bitPattern: try reader.u32(108)))) {
+                zone = stored
+            }
             let childCount = Int(try reader.u32(20))
             var offset = Int(try reader.u32(4))
             for _ in 0..<childCount {
@@ -63,6 +73,10 @@ public struct AppleLibrary: Sendable, Equatable {
             info.genre = strings[5] ?? ""
             info.durationMs = Int(try reader.u32(offset + 40))
             info.trackNumber = Int(try reader.u32(offset + 44))
+            info.playCount = Int(try reader.u32(offset + 80))
+            info.lastPlayed = PlayStatistics.date(fromDeviceTime: try reader.u32(offset + 88), timeZone: zone)
+            info.dateAdded = PlayStatistics.date(fromDeviceTime: try reader.u32(offset + 104), timeZone: zone)
+            if headerLength >= 160 { info.skipCount = Int(try reader.u32(offset + 156)) }
             tracks[try reader.u64(offset + 112)] = info
             offset += totalLength
         }

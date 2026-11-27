@@ -21,6 +21,7 @@ usage: shufflectl [--device PATH] <command> [arguments]
   playlist add NAME TRACK...
   playlist remove NAME TRACK...
   voiceover on|off|rebuild             turn announcements on or off, or record them all again
+  sync                                 write what is pending: plays the iPod recorded, Finder's list of songs
   check                                compare the database with the files on the iPod
   cleanup [--yes]                      list unused files; delete them with --yes
   dump                                 decode the database (changes nothing)
@@ -157,9 +158,13 @@ func commit(_ session: DeviceSession, _ arguments: Arguments) async throws {
     if summary.announcementsRecorded > 0 { parts.append("\(summary.announcementsRecorded) announcement(s) recorded") }
     if summary.announcementsFailed > 0 { parts.append("\(summary.announcementsFailed) title(s) could not be spoken") }
     if summary.filesRemoved > 0 { parts.append("\(summary.filesRemoved) file(s) removed") }
+    if summary.appleLibraryWritten { parts.append("Finder's list updated") }
     if parts.isEmpty, summary.librarySaved { parts.append("saved") }
     print(parts.isEmpty ? "nothing to change" : parts.joined(separator: ", "))
-    if let backup = summary.backup, summary.databaseWritten { print("previous database saved in \(backup.path)") }
+    if let backup = summary.backup, summary.databaseWritten || summary.appleLibraryWritten {
+        print("previous files saved in \(backup.path)")
+    }
+    if let problem = summary.appleLibraryProblem { print("Finder's list was not updated: \(problem)") }
 }
 
 func run(_ raw: [String]) async throws {
@@ -205,6 +210,11 @@ func run(_ raw: [String]) async throws {
         print("\(library.playlists.count) playlists; VoiceOver \(library.voiceOverEnabled ? "on" : "off")")
         let unused = await session.unusedFiles()
         if !unused.isEmpty { print("\(unused.count) unused file(s), \(bytes(unused.reduce(0) { $0 + $1.sizeBytes })) (see `cleanup`)") }
+        switch await session.appleLibraryStatus() {
+        case .inStep, .absent: break
+        case let .behind(changes): print("Finder's list is out of date: \(changes.pendingSummary) (see `sync`)")
+        case let .unreadable(reason): print("Finder's list cannot be kept up to date: \(reason)")
+        }
 
     case "list":
         if let name = arguments.options["playlist"] {
@@ -312,11 +322,15 @@ func run(_ raw: [String]) async throws {
         }
         try await commit(session, arguments)
 
+    case "sync":
+        try await commit(session, arguments)
+
     case "check":
         let problems = await session.verify()
         if problems.isEmpty {
             library = await session.snapshot()
-            print("ok: \(library.tracks.count) tracks, every file and announcement is in place")
+            let finder = await session.appleLibraryStatus() == .inStep ? "; Finder's list matches" : ""
+            print("ok: \(library.tracks.count) tracks, every file and announcement is in place\(finder)")
         } else {
             problems.forEach { print($0) }
             throw Failure("\(problems.count) problem(s) found")

@@ -79,6 +79,10 @@ public enum DeviceImporter {
                 track.artist = info.artist
                 track.album = info.album
                 track.genre = info.genre
+                track.playCount = info.playCount
+                track.skipCount = info.skipCount
+                track.lastPlayed = info.lastPlayed
+                track.dateAdded = info.dateAdded
                 if track.durationMs == 0 { track.durationMs = info.durationMs }
             }
             if track.title.isEmpty || track.durationMs == 0, let tags = await tagReader?(url) {

@@ -5,6 +5,9 @@ import Testing
 enum Fixture {
     /// Written by Apple's sync on macOS 27.2.1 (library IDs replaced by made-up ones).
     static let appleSync = "apple-sync-current.itunessd"
+    /// Apple's library file from the same sync as `appleSync`: its exact structure, with every name,
+    /// ID, date, play count and size replaced by made-up values (IDs match `appleSync`).
+    static let appleLibrary = "apple-sync-current.itunesdb"
     /// The Apple database plus four tracks and a playlist appended; played on a real iPod shuffle 4G.
     static let deviceTested = "device-tested-current.itunessd"
     /// Written by the legacy `ipod-shuffle-4g.py` for a made-up folder tree.

@@ -20,8 +20,12 @@ It replaces the Python script this repository started as (still here, see
   mixes and audiobooks) and skip when shuffling.
 - **Reads what is already there**: music synced earlier by Finder keeps its titles, playlists and
   recordings.
-- **Is careful with the device**: opening never writes; the previous database is copied to the Mac
-  before the first change of a session; the database is replaced in one step and checked afterwards.
+- **Keeps Finder in the picture**: Finder lists an iPod's songs from a second file on it, Apple's
+  library file. Shuffler updates that file along with the play database, so a song removed or added
+  here is removed or added there too.
+- **Is careful with the device**: an iPod it has not changed before is only read until you change
+  something; the files about to be replaced are copied to the Mac before the first change of a
+  session; each is replaced in one step and checked afterwards.
 
 ## Install
 
@@ -76,12 +80,15 @@ shufflectl remove TRACK...
 shufflectl set TRACK [--title T] [--artist A] [--say TEXT] [--language TAG] [--remember on|off] [--skip-shuffle on|off]
 shufflectl playlist create|delete|rename|add|remove ...
 shufflectl voiceover on|off|rebuild
+shufflectl sync
 shufflectl check
 shufflectl cleanup [--yes]
 shufflectl dump
 ```
 
 `--device PATH` selects an iPod when several are connected, or points at a folder laid out like one.
+`sync` writes what is pending without changing anything else: plays the iPod recorded, and Finder's
+list of songs if it has fallen behind. `check` says whether there is anything of the kind.
 
 ## How it works
 
@@ -92,25 +99,43 @@ described in [docs/iTunesSD3gen.md](docs/iTunesSD3gen.md); the layout Apple's cu
 differs slightly and is documented in
 [ShuffleDatabase.swift](Sources/ShuffleKit/Database/ShuffleDatabase.swift).
 
+Next to it lies `iTunesDB`, the library file of Apple's own software: titles, albums, playlists by
+name, play counts. The iPod never reads it, but Finder does, and lists the iPod's songs from it.
+Shuffler edits it in place rather than rebuilding it: records of removed songs go, songs and playlists
+made here get records shaped like the ones Apple wrote, and everything else stays byte for byte as it
+was. The file is only touched if it can be read completely and written back identically first; the
+layout is described in [AppleLibraryFile.swift](Sources/ShuffleKit/Library/AppleLibraryFile.swift)
+and [AppleLibraryMirror.swift](Sources/ShuffleKit/Library/AppleLibraryMirror.swift).
+
 | On the iPod | Purpose | Shuffler |
 |---|---|---|
 | `iPod_Control/iTunes/iTunesSD` | play database | reads and writes |
 | `iPod_Control/iTunes/iTunesStats` | play counts and resume positions, written by the iPod | reads, then resets |
-| `iPod_Control/iTunes/iTunesDB` | Apple's library file | reads titles from it, never writes |
+| `iPod_Control/iTunes/iTunesDB` | Apple's library file, which Finder shows | reads titles from it; keeps it in step |
 | `iPod_Control/Music/F00`–`F02` | the music, under short names | adds and removes files |
 | `iPod_Control/Speakable/Tracks`, `Playlists` | announcements | adds and removes recordings |
 | `iPod_Control/Speakable/Messages`, `System` | system prompts ("Battery low") | leaves alone |
 | `iPod_Control/Shuffler/library.json` | titles, playlist names, what was last written | its own notes |
 
-Backups of the database go to `~/Library/Application Support/Shuffler/Backups` (iPod menu ▸ Show
+Backups of both databases go to `~/Library/Application Support/Shuffler/Backups` (iPod menu ▸ Show
 Backups in Finder), the last 20 per iPod.
 
 ## Good to know
 
-- **Finder sync and Shuffler do not know about each other.** If Finder syncs the iPod it rewrites
-  the database from the Mac's music library. Shuffler notices, reloads, and keeps what it knew about
-  songs that are still there; songs it had added may be left behind as unused files (iPod menu ▸
-  Remove Unused Files). Turning off automatic syncing for the iPod in Finder avoids surprises.
+- **Finder sees what Shuffler did, but its sync still follows the Mac's music library.** A sync
+  from Finder makes the iPod match what is ticked there: a song removed here comes back if it is
+  still selected in Finder, and one added here may be taken off again. Shuffler notices, reloads,
+  and keeps what it knew about songs that are still there; files left belonging to nothing can be
+  cleared with iPod menu ▸ Remove Unused Files. Turning off automatic syncing for the iPod in
+  Finder avoids surprises.
+- **Finder reads the iPod when it is connected.** A change made here shows in Finder after the iPod
+  has been ejected and connected again.
+- **Apple's library file is updated, never invented.** An iPod that has none (it was never synced by
+  Apple's software) does not get one, and a file Shuffler cannot reproduce exactly is left as it is;
+  `shufflectl check` says so. The iPod plays the same either way.
+- **An iPod Shuffler already changed is brought in line on opening.** Earlier builds left Apple's
+  file alone, so Finder kept listing removed songs. Opening such an iPod now corrects the file once,
+  after a backup. An iPod Shuffler has never written is not touched until you change something.
 - **Podcast and audiobook lists** from Apple's sync are shown as ordinary playlists.
 - **System prompts** stay in the language they were installed in.
 - **Copy-protected purchases** cannot be added; only Apple's sync can authorise an iPod for them.
@@ -121,7 +146,7 @@ Backups in Finder), the last 20 per iPod.
 Sources/ShuffleKit   everything that touches the iPod; no UI (database codec, import, VoiceOver, sync)
 Sources/Shuffler     the SwiftUI app
 Sources/shufflectl   the terminal tool
-Tests/               tests, including fixtures of real databases (one written by Apple's sync)
+Tests/               tests, including fixtures of real databases and of Apple's library file
 scripts/             app bundle, disk image and icon
 ```
 

@@ -14,6 +14,8 @@ This changlog uses the [ISO 8601 date format](https://www.iso.org/iso-8601-date-
 * `shufflectl`, a command-line tool on the same engine
 * `ShuffleKit`, the library behind both, with tests against real databases
 * Support for the database layout Apple's sync writes today (version `0x02010001`)
+* Apple's library file (`iTunesDB`) is kept in step with the play database, so Finder's list of the
+  iPod's songs matches what is on it; `shufflectl sync` and `check` cover it from the terminal
 * `scripts/build-app.sh` to build the app bundle and a disk image
 
 ### Fixed

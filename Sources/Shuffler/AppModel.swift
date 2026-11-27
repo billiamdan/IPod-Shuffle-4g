@@ -63,6 +63,8 @@ final class AppModel {
     @ObservationIgnored private var debounce: Task<Void, Never>?
     @ObservationIgnored private var commitTask: Task<Void, Never>?
     @ObservationIgnored private var commitRequestedAgain = false
+    /// The next commit only brings Finder's list in step; say so when it is done.
+    @ObservationIgnored private var catchingUp = false
     @ObservationIgnored private var importTask: Task<Void, Never>?
     @ObservationIgnored private var observers: [NSObjectProtocol] = []
     @ObservationIgnored private var sound: NSSound?
@@ -120,6 +122,13 @@ final class AppModel {
             sidebarSelection = .allSongs
             refreshCapacity()
             unusedFiles = await session.unusedFiles()
+            // Earlier builds of this app changed the iPod without telling Apple's library file, which is
+            // what Finder lists. That is this app's unfinished business, so it is settled without asking.
+            if await session.appleLibraryNeedsCatchUp() {
+                catchingUp = true
+                hasUnsavedChanges = true
+                startCommit()
+            }
         } catch {
             device = nil
             alert = AlertInfo(title: "“\(target.name)” could not be opened", message: error.localizedDescription)
@@ -164,6 +173,7 @@ final class AppModel {
         hasUnsavedChanges = false
         statusMessage = nil
         pendingEdits = 0
+        catchingUp = false
     }
 
     private func refreshCapacity() {
@@ -514,6 +524,8 @@ final class AppModel {
 
     private func performCommit(_ session: DeviceSession) async {
         let settings = voiceSettings
+        let wasCatchingUp = catchingUp
+        catchingUp = false
         do {
             let summary = try await session.commit(voiceOver: settings) { [weak self] progress in
                 Task { @MainActor in self?.show(progress) }
@@ -525,6 +537,11 @@ final class AppModel {
             unusedFiles = await session.unusedFiles()
             if summary.announcementsFailed > 0 {
                 statusMessage = "\(summary.announcementsFailed) title(s) could not be spoken"
+            } else if summary.appleLibraryProblem != nil {
+                // The iPod itself is fine; only Finder's view of it stays as it was.
+                statusMessage = "Finder’s list of this iPod could not be updated"
+            } else if wasCatchingUp, summary.appleLibraryWritten {
+                statusMessage = "Finder’s list updated; it shows there after the iPod is reconnected"
             }
         } catch SessionError.changedElsewhere {
             alert = AlertInfo(

@@ -206,7 +206,7 @@ struct AppleLibraryTests {
     func readsNames() {
         let data = AppleLibraryBuilder.make(
             tracks: [(id: 10, title: "Группа крови", artist: "Кино", album: "A", durationMs: 5000)],
-            playlists: [(id: 77, name: "Road Trip", isMaster: false)]
+            playlists: [(id: 77, name: "Road Trip", isMaster: false, tracks: [0])]
         )
         let library = AppleLibrary(data: data)
         #expect(library.tracks[10]?.title == "Группа крови")
