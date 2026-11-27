@@ -28,28 +28,30 @@ private struct TrackInspector: View {
     @Environment(AppModel.self) private var model
     let track: Track
 
-    @State private var title: String
-    @State private var artist: String
-    @State private var album: String
-    @State private var spokenName: String
+    // Drafts, not plain strings: this view stays alive while the panel is hidden, so each field has
+    // to follow the library and write back only what was typed here (see `FieldDraft`).
+    @State private var title: FieldDraft
+    @State private var artist: FieldDraft
+    @State private var album: FieldDraft
+    @State private var spokenName: FieldDraft
     @FocusState private var focus: Field?
 
     private enum Field { case title, artist, album, spokenName }
 
     init(track: Track) {
         self.track = track
-        _title = State(initialValue: track.title)
-        _artist = State(initialValue: track.artist)
-        _album = State(initialValue: track.album)
-        _spokenName = State(initialValue: track.spokenName ?? "")
+        _title = State(initialValue: FieldDraft(track.title))
+        _artist = State(initialValue: FieldDraft(track.artist))
+        _album = State(initialValue: FieldDraft(track.album))
+        _spokenName = State(initialValue: FieldDraft(track.spokenName ?? ""))
     }
 
     var body: some View {
         Form {
             Section("Song") {
-                TextField("Title", text: $title).focused($focus, equals: .title)
-                TextField("Artist", text: $artist).focused($focus, equals: .artist)
-                TextField("Album", text: $album).focused($focus, equals: .album)
+                TextField("Title", text: $title.text).focused($focus, equals: .title)
+                TextField("Artist", text: $artist.text).focused($focus, equals: .artist)
+                TextField("Album", text: $album.text).focused($focus, equals: .album)
             }
 
             Section {
@@ -58,7 +60,7 @@ private struct TrackInspector: View {
                         .multilineTextAlignment(.trailing)
                         .textSelection(.enabled)
                 }
-                TextField("Custom wording", text: $spokenName, prompt: Text("Same as above"))
+                TextField("Custom wording", text: $spokenName.text, prompt: Text("Same as above"))
                     .focused($focus, equals: .spokenName)
                 Picker("Language", selection: Binding(
                     get: { track.spokenLanguage ?? "" },
@@ -118,15 +120,19 @@ private struct TrackInspector: View {
         .onSubmit(commit)
         .onChange(of: focus) { commit() }
         .onDisappear(perform: commit)
+        .onChange(of: track.title) { _, value in title.follow(value) }
+        .onChange(of: track.artist) { _, value in artist.follow(value) }
+        .onChange(of: track.album) { _, value in album.follow(value) }
+        .onChange(of: track.spokenName) { _, value in spokenName.follow(value ?? "") }
     }
 
     /// The track with whatever is typed in the fields right now.
     private var edited: Track {
         var copy = track
-        copy.title = title
-        copy.artist = artist
-        copy.album = album
-        copy.spokenName = spokenName.isEmpty ? nil : spokenName
+        copy.title = title.text
+        copy.artist = artist.text
+        copy.album = album.text
+        copy.spokenName = spokenName.text.isEmpty ? nil : spokenName.text
         return copy
     }
 
@@ -146,23 +152,18 @@ private struct TrackInspector: View {
         }
     }
 
+    /// Saves the fields that were changed here, and only those.
     private func commit() {
-        let newTitle = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        let newArtist = artist.trimmingCharacters(in: .whitespacesAndNewlines)
-        let newAlbum = album.trimmingCharacters(in: .whitespacesAndNewlines)
-        let newSpoken = spokenName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !newTitle.isEmpty else {
-            title = track.title
-            return
-        }
-        guard newTitle != track.title || newArtist != track.artist || newAlbum != track.album || newSpoken != (track.spokenName ?? "") else {
-            return
-        }
+        let newTitle = title.takeEdit(allowEmpty: false)
+        let newArtist = artist.takeEdit()
+        let newAlbum = album.takeEdit()
+        let newSpoken = spokenName.takeEdit()
+        guard newTitle != nil || newArtist != nil || newAlbum != nil || newSpoken != nil else { return }
         model.update(trackID: track.id) { track in
-            track.title = newTitle
-            track.artist = newArtist
-            track.album = newAlbum
-            track.spokenName = newSpoken.isEmpty ? nil : newSpoken
+            if let newTitle { track.title = newTitle }
+            if let newArtist { track.artist = newArtist }
+            if let newAlbum { track.album = newAlbum }
+            if let newSpoken { track.spokenName = newSpoken.isEmpty ? nil : newSpoken }
         }
     }
 }
@@ -200,23 +201,23 @@ private struct PlaylistInspector: View {
     @Environment(AppModel.self) private var model
     let playlist: Playlist
 
-    @State private var name: String
-    @State private var spokenName: String
+    @State private var name: FieldDraft
+    @State private var spokenName: FieldDraft
 
     init(playlist: Playlist) {
         self.playlist = playlist
-        _name = State(initialValue: playlist.name)
-        _spokenName = State(initialValue: playlist.spokenName ?? "")
+        _name = State(initialValue: FieldDraft(playlist.name))
+        _spokenName = State(initialValue: FieldDraft(playlist.spokenName ?? ""))
     }
 
     var body: some View {
         Form {
             Section("Playlist") {
-                TextField("Name", text: $name)
+                TextField("Name", text: $name.text)
                 LabeledContent("Songs", value: "\(playlist.trackIDs.count)")
             }
             Section {
-                TextField("Custom wording", text: $spokenName, prompt: Text(playlist.name))
+                TextField("Custom wording", text: $spokenName.text, prompt: Text(playlist.name))
                 Picker("Language", selection: Binding(
                     get: { playlist.spokenLanguage ?? "" },
                     set: { value in
@@ -243,13 +244,19 @@ private struct PlaylistInspector: View {
         .formStyle(.grouped)
         .onSubmit(commit)
         .onDisappear(perform: commit)
+        // The playlist can be renamed in the sidebar while this panel exists; follow it.
+        .onChange(of: playlist.name) { _, value in name.follow(value) }
+        .onChange(of: playlist.spokenName) { _, value in spokenName.follow(value ?? "") }
     }
 
+    /// Saves the fields that were changed here, and only those.
     private func commit() {
-        model.renamePlaylist(playlist.id, to: name)
-        let wording = spokenName.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard wording != (playlist.spokenName ?? "") else { return }
-        let id = playlist.id
-        model.edit { $0.update(playlistID: id) { $0.spokenName = wording.isEmpty ? nil : wording } }
+        if let newName = name.takeEdit(allowEmpty: false) {
+            model.renamePlaylist(playlist.id, to: newName)
+        }
+        if let wording = spokenName.takeEdit() {
+            let id = playlist.id
+            model.edit { $0.update(playlistID: id) { $0.spokenName = wording.isEmpty ? nil : wording } }
+        }
     }
 }

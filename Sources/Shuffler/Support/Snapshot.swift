@@ -7,9 +7,10 @@ import SwiftUI
 ///
 /// The app opens, draws each of its windows into a PNG and quits. Because it draws its own views,
 /// no screen-recording permission is involved. `SHUFFLER_SNAPSHOT_SCENE` picks what to show:
-/// `list` (default), `inspector`, `playlist`, `settings`, or `exercise`, which first runs a scripted
-/// session through the same code paths the window uses (add the files in `SHUFFLER_SNAPSHOT_FILES`
-/// to a new playlist, reorder, edit, remove) so the result on the device can be checked afterwards.
+/// `list` (default), `inspector`, `playlist`, `settings`, or one of two scripted sessions that go
+/// through the same code paths the window uses, so the result on the device can be checked afterwards:
+/// `exercise` (add the files in `SHUFFLER_SNAPSHOT_FILES` to a new playlist, reorder, edit, remove)
+/// and `rename` (create a playlist, name it, switch to another list; prints the name at each step).
 @MainActor
 enum Snapshot {
     static func runIfRequested(model: AppModel) {
@@ -34,6 +35,8 @@ enum Snapshot {
                 model.settingsRequested = true
             case "exercise":
                 await exercise(model)
+            case "rename":
+                await renameScenario(model)
             default:
                 break
             }
@@ -83,5 +86,20 @@ enum Snapshot {
         model.sidebarSelection = .playlist(playlistID)
         if let first = model.rows.first { model.removeFromPlaylist(rowIDs: [first.id]) }
         await model.waitUntilIdle()
+    }
+
+    /// What a person does when naming a new playlist: create it, let the window show it, type a name
+    /// in the sidebar, then click another list. Prints the name before and after leaving the playlist.
+    private static func renameScenario(_ model: AppModel) async {
+        let id = model.createPlaylist()
+        try? await Task.sleep(for: .milliseconds(1200))
+        model.renamePlaylist(id, to: "Evening Mix")
+        model.renamingPlaylist = nil
+        try? await Task.sleep(for: .milliseconds(400))
+        print("after typing the name: \(model.library.playlist(id)?.name ?? "?")")
+        model.sidebarSelection = .allSongs
+        try? await Task.sleep(for: .milliseconds(1200))
+        await model.waitUntilIdle()
+        print("after switching to All Songs: \(model.library.playlist(id)?.name ?? "?")")
     }
 }
