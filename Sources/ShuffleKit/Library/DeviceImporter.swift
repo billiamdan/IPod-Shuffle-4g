@@ -29,7 +29,7 @@ public struct ProbedTags: Sendable, Equatable {
 public typealias TagReader = @Sendable (URL) async -> ProbedTags?
 
 /// Builds a `Library` from what is on the iPod. Used the first time this app sees a device,
-/// and again whenever other software (Apple's sync, the legacy script) has changed it since.
+/// and again whenever other software (Apple's sync, the `ipod-shuffle-4g.py` script) has changed it since.
 public enum DeviceImporter {
     /// - Parameters:
     ///   - previous: what this app knew before, if anything. Titles and settings of tracks that are
@@ -51,7 +51,7 @@ public enum DeviceImporter {
         )
 
         // Tracks. IDs must be unique because they name VoiceOver files and identify rows;
-        // the legacy script derived them from the title, so two tracks could share one.
+        // `ipod-shuffle-4g.py` derived them from the title, so two tracks could share one.
         var taken: Set<UInt64> = [0]
         for record in database.tracks {
             var record = record

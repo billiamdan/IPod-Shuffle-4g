@@ -138,7 +138,7 @@ struct AppleLibrarySyncTests {
         #expect(await second.appleLibraryNeedsCatchUp() == false)
         #expect(try FileManager.default.subpathsOfDirectory(atPath: backups.url.path).contains { $0.hasSuffix("iTunesDB") })
 
-        // Another program (the legacy script, say) rebuilt the database with fewer songs. This app has never
+        // Another program (`ipod-shuffle-4g.py`, say) rebuilt the database with fewer songs. This app has never
         // written this iPod, so it only reports the difference; the user's first change settles it.
         let foreign = try FakeDevice.appleSynced()
         var database = try ShuffleDatabase(data: foreign.databaseOnDisk)

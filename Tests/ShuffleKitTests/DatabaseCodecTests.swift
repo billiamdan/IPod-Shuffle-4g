@@ -55,7 +55,7 @@ struct DatabaseCodecTests {
         #expect(try database.encoded() == original)
     }
 
-    @Test("The legacy script's database round-trips, including a path that fills the whole field")
+    @Test("A database written by ipod-shuffle-4g.py round-trips, including a path that fills the whole field")
     func legacyDatabaseRoundTrips() throws {
         let original = try Fixture.data(Fixture.legacyScript)
         let database = try ShuffleDatabase(data: original)

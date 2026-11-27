@@ -10,7 +10,8 @@ enum Fixture {
     static let appleLibrary = "apple-sync-current.itunesdb"
     /// The Apple database plus four tracks and a playlist appended; played on a real iPod shuffle 4G.
     static let deviceTested = "device-tested-current.itunessd"
-    /// Written by the legacy `ipod-shuffle-4g.py` for a made-up folder tree.
+    /// Written by `ipod-shuffle-4g.py`, the Python script this project replaced (it is still in the
+    /// project this one was forked from), for a made-up folder tree.
     static let legacyScript = "legacy-script.itunessd"
 
     static func data(_ name: String) throws -> Data {

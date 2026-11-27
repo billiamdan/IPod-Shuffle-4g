@@ -1,8 +1,6 @@
-*.pyc
 *~
 *.swp
 *.log
-*.conf
 
 # Swift build output and packaged app
 .build/
