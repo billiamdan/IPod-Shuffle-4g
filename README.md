@@ -3,8 +3,9 @@
 A native macOS app for the iPod shuffle (3rd and 4th generation): copy music onto it, manage its
 playlists, and give every song and playlist a spoken name for the VoiceOver button.
 
-It replaces the Python script this repository started as (still here, see
-[Legacy script](#legacy-script)) and needs nothing installed besides macOS 14 or later.
+It replaces the Python script this repository started as and needs nothing installed besides
+macOS 14 or later. The script, `ipod-shuffle-4g.py`, also runs on Linux and lives on in the
+[project this one was forked from](https://github.com/nims11/IPod-Shuffle-4g).
 
 ## What it does
 
@@ -158,32 +159,6 @@ SHUFFLER_DEVICE=/path/to/folder-with-iPod_Control swift run Shuffler
 
 `SHUFFLER_SNAPSHOT=/tmp/window.png` makes the app draw its windows into PNG files and quit (see
 [Snapshot.swift](Sources/Shuffler/Support/Snapshot.swift)); `SHUFFLER_BACKUP_DIR` redirects backups.
-
-## Legacy script
-
-`ipod-shuffle-4g.py` is the original command-line script (Python 3, optional
-[Mutagen](https://mutagen.readthedocs.io)). It rebuilds the database from whatever files are already
-on the iPod and is kept for Linux users:
-
-```
-$ ./ipod-shuffle-4g.py --help
-usage: ipod-shuffle-4g.py [-h] [-t] [-p] [-u] [-g TRACK_GAIN]
-                          [-d [AUTO_DIR_PLAYLISTS]] [-i [ID3_TEMPLATE]] [-v]
-                          path
-```
-
-Two things it gets wrong that the new code does not: WAV files are given the MP3 type code, so the
-iPod stays silent for them, and paths longer than 256 bytes are cut off without warning.
-
-Its tips still apply when the iPod is managed from Linux:
-
-- **Disable the trash**: an empty file named `.Trash-1000` in the iPod's root makes Linux delete
-  files instead of moving them to a trash folder ([extras](extras)).
-- **Rhythmbox**: put [extras/.is_audio_player](extras/.is_audio_player) in the iPod's root, disable
-  Rhythmbox's iPod plugin and enable its MTP plugin; the script then picks up the `.pls` playlists
-  Rhythmbox writes.
-- **Reformatting**: the iPod has no partition table; create the FAT file system directly on the
-  device (`sudo mkfs.vfat -I -F 16 -n IPOD /dev/sdX`), then rebuild the database.
 
 ## Credits and further reading
 

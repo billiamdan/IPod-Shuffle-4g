@@ -12,7 +12,7 @@ let package = Package(
     targets: [
         // Everything that touches the iPod: database codec, import, VoiceOver, sync. No UI.
         .target(name: "ShuffleKit"),
-        // The same engine from the terminal; replaces the old Python script.
+        // The same engine from the terminal.
         .executableTarget(name: "shufflectl", dependencies: ["ShuffleKit"]),
         // The Mac app. `scripts/build-app.sh` wraps the binary into Shuffler.app and a DMG.
         .executableTarget(name: "Shuffler", dependencies: ["ShuffleKit"]),

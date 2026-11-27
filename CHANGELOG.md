@@ -18,6 +18,13 @@ This changlog uses the [ISO 8601 date format](https://www.iso.org/iso-8601-date-
   iPod's songs matches what is on it; `shufflectl sync` and `check` cover it from the terminal
 * `scripts/build-app.sh` to build the app bundle and a disk image
 
+### Removed
+
+* The Python script `ipod-shuffle-4g.py` and the `extras` folder with its helper files for Linux.
+  Shuffler and `shufflectl` take their place on macOS; for Linux the script remains available in the
+  [project this one was forked from](https://github.com/nims11/IPod-Shuffle-4g). Databases the script
+  wrote can still be opened
+
 ### Fixed
 
 * WAV files are registered with type code 4; the script's code 1 leaves the iPod silent for them

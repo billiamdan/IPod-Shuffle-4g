@@ -5,7 +5,8 @@ public struct Announcement: Codable, Sendable, Equatable {
     public enum State: String, Codable, Sendable {
         /// No recording on the iPod.
         case missing
-        /// A recording made by other software (Apple's sync, the legacy script). Kept until the user asks otherwise.
+        /// A recording made by other software (Apple's sync, the `ipod-shuffle-4g.py` script).
+        /// Kept until the user asks otherwise.
         case inherited
         /// Recorded by this app from `text` with `voice`.
         case generated
