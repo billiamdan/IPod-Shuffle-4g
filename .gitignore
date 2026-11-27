@@ -3,3 +3,14 @@
 *.swp
 *.log
 *.conf
+
+# Swift build output and packaged app
+.build/
+.swiftpm/
+dist/
+
+# Copies of an iPod made while testing (contain track titles)
+ipod-backup/
+
+# Finder metadata
+.DS_Store

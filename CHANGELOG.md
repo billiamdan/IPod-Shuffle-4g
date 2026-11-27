@@ -7,6 +7,21 @@ This changlog uses the [ISO 8601 date format](https://www.iso.org/iso-8601-date-
 
 ## [Unreleased]
 
+### Added
+
+* Shuffler, a native macOS app (Swift 6, SwiftUI) that copies music to the iPod, manages playlists
+  and records VoiceOver announcements with the system voices
+* `shufflectl`, a command-line tool on the same engine
+* `ShuffleKit`, the library behind both, with tests against real databases
+* Support for the database layout Apple's sync writes today (version `0x02010001`)
+* `scripts/build-app.sh` to build the app bundle and a disk image
+
+### Fixed
+
+* WAV files are registered with type code 4; the script's code 1 leaves the iPod silent for them
+* Paths longer than the 256-byte field are refused instead of silently cut off
+* The database is replaced in one step, so an interrupted run no longer leaves an empty one
+
 ## [1.5.1] - 2021-06-05
 
 ### Changed
