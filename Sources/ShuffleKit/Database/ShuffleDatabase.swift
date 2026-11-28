@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import Foundation
 
 /// The play database the iPod shuffle (3rd and 4th generation) firmware reads from

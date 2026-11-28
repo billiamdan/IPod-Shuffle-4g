@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import Foundation
 
 /// The text in an editable field, together with the stored value it was last in step with.

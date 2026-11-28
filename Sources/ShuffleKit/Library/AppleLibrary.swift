@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import Foundation
 
 /// A forgiving reader for Apple's `iTunesDB`, the library file Apple's sync keeps next to the play database.

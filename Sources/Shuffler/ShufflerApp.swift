@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import AppKit
 import ShuffleKit
 import SwiftUI
@@ -56,6 +59,10 @@ struct AppCommands: Commands {
 
     var body: some Commands {
         let connected = model.device != nil
+
+        CommandGroup(replacing: .appInfo) {
+            Button("About Shuffler") { AboutPanel.show() }
+        }
 
         CommandGroup(replacing: .newItem) {
             Button("Add Music…") { model.chooseFilesToAdd() }

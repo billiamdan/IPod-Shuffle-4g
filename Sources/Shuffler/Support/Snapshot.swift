@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import AppKit
 import SwiftUI
 
@@ -7,7 +10,7 @@ import SwiftUI
 ///
 /// The app opens, draws each of its windows into a PNG and quits. Because it draws its own views,
 /// no screen-recording permission is involved. `SHUFFLER_SNAPSHOT_SCENE` picks what to show:
-/// `list` (default), `inspector`, `playlist`, `settings`, or one of two scripted sessions that go
+/// `list` (default), `inspector`, `playlist`, `settings`, `about`, or one of two scripted sessions that go
 /// through the same code paths the window uses, so the result on the device can be checked afterwards:
 /// `exercise` (add the files in `SHUFFLER_SNAPSHOT_FILES` to a new playlist, reorder, edit, remove)
 /// and `rename` (create a playlist, name it, switch to another list; prints the name at each step).
@@ -33,6 +36,8 @@ enum Snapshot {
                 if let playlist = model.library.playlists.last { model.sidebarSelection = .playlist(playlist.id) }
             case "settings":
                 model.settingsRequested = true
+            case "about":
+                AboutPanel.show()
             case "exercise":
                 await exercise(model)
             case "rename":

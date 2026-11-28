@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import Foundation
 import ShuffleKit
 
@@ -32,6 +35,9 @@ options:
   --device PATH      the iPod's volume or folder (default: the only connected iPod)
   --language TAG     language of announcements, e.g. en-US (default: the Mac's language)
   --also TAG,TAG     further languages a title may be spoken in when clearly written in one
+
+Shuffler is free software under the GNU General Public License, version 2 or later, and comes
+with no warranty. Source code: https://github.com/billiamdan/shuffler
 """
 
 struct Arguments {

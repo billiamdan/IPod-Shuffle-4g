@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 // Draws the app icon and writes it as an .iconset folder (turned into .icns by `iconutil`).
 // usage: swift scripts/make-icon.swift <output.iconset>
 import AppKit
