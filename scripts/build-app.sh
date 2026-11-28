@@ -1,4 +1,7 @@
 #!/bin/bash
+# SPDX-FileCopyrightText: 2026 billiamdan
+# SPDX-License-Identifier: GPL-2.0-or-later
+
 # Builds dist/Shuffler.app and dist/Shuffler-<version>.dmg.
 #
 #   scripts/build-app.sh
@@ -19,6 +22,8 @@ BUILD="${BUILD:-$(git rev-list --count HEAD 2>/dev/null || echo 1)}"
 BUNDLE_ID="${BUNDLE_ID:-io.github.billiamdan.shuffler}"
 SIGN_IDENTITY="${SIGN_IDENTITY:--}"
 ARCHS="${ARCHS:-arm64 x86_64}"
+COPYRIGHT="© 2026 billiamdan"
+SOURCE_URL="https://github.com/billiamdan/shuffler"
 DIST="dist"
 APP="$DIST/$APP_NAME.app"
 DMG="$DIST/$APP_NAME-$VERSION.dmg"
@@ -43,6 +48,8 @@ cp "$BIN/shufflectl" "$APP/Contents/MacOS/shufflectl"
 swift scripts/make-icon.swift "$DIST/AppIcon.iconset"
 iconutil -c icns "$DIST/AppIcon.iconset" -o "$APP/Contents/Resources/AppIcon.icns"
 rm -rf "$DIST/AppIcon.iconset"
+# The licence travels with the app (GPL section 1).
+cp COPYING "$APP/Contents/Resources/COPYING"
 
 cat > "$APP/Contents/Info.plist" <<PLIST
 <?xml version="1.0" encoding="UTF-8"?>
@@ -54,6 +61,7 @@ cat > "$APP/Contents/Info.plist" <<PLIST
     <key>CFBundleIdentifier</key><string>$BUNDLE_ID</string>
     <key>CFBundleExecutable</key><string>Shuffler</string>
     <key>CFBundlePackageType</key><string>APPL</string>
+    <key>NSHumanReadableCopyright</key><string>$COPYRIGHT</string>
     <key>CFBundleShortVersionString</key><string>$VERSION</string>
     <key>CFBundleVersion</key><string>$BUILD</string>
     <key>CFBundleIconFile</key><string>AppIcon</string>
@@ -91,6 +99,24 @@ echo "==> Building $DMG"
 mkdir -p "$STAGE"
 cp -R "$APP" "$STAGE/"
 ln -s /Applications "$STAGE/Applications"
+# Whoever receives the image gets the licence and learns where the matching source is (GPL sections 1 and 3).
+cp COPYING "$STAGE/License.txt"
+COMMIT="$(git rev-parse HEAD 2>/dev/null || echo unknown)"
+LOCAL_CHANGES=""
+if [ -n "$(git status --porcelain 2>/dev/null)" ]; then
+    LOCAL_CHANGES=", plus local changes that are not in that commit"
+fi
+cat > "$STAGE/Source Code.txt" <<NOTE
+$APP_NAME $VERSION (build $BUILD)
+$COPYRIGHT
+
+$APP_NAME is free software: you can redistribute it and/or modify it under the terms of the
+GNU General Public License as published by the Free Software Foundation, either version 2 of
+the License, or (at your option) any later version. It comes with no warranty; see License.txt.
+
+Source code: $SOURCE_URL
+This copy was built from commit $COMMIT$LOCAL_CHANGES.
+NOTE
 rm -f "$DMG"
 if diskutil image create from --help >/dev/null 2>&1; then
     # macOS 26 and later: hdiutil's image creation is deprecated in favour of diskutil.

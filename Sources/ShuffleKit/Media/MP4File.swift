@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import Foundation
 
 /// Just enough MPEG-4 container parsing to tell where the index sits.

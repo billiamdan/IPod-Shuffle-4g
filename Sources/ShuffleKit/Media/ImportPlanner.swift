@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import Foundation
 
 /// What to do with uncompressed and lossless music, which is large for a 2 GB player.

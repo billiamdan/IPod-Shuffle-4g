@@ -160,10 +160,29 @@ SHUFFLER_DEVICE=/path/to/folder-with-iPod_Control swift run Shuffler
 `SHUFFLER_SNAPSHOT=/tmp/window.png` makes the app draw its windows into PNG files and quit (see
 [Snapshot.swift](Sources/Shuffler/Support/Snapshot.swift)); `SHUFFLER_BACKUP_DIR` redirects backups.
 
+## Licence
+
+Copyright © 2026 billiamdan. Shuffler is free software: you can redistribute it and/or modify it
+under the terms of the GNU General Public License as published by the Free Software Foundation,
+either version 2 of the License, or (at your option) any later version. It comes with no warranty.
+The full text is in [COPYING](COPYING); each source file carries the short form,
+`SPDX-License-Identifier: GPL-2.0-or-later`.
+
+The disk image contains the licence and a note naming the commit it was built from. When you pass
+the image on, make that source available as well, for example by publishing the image as a release
+of this repository.
+
+The two pages in [docs](docs) are copies of a wiki that never stated a licence. They are kept for
+reference and are not covered by the statement above ([docs/README.md](docs/README.md)).
+
+iPod is a trademark of Apple Inc. Shuffler is not affiliated with or endorsed by Apple.
+
 ## Credits and further reading
 
-Forked from the [shuffle-db-ng project](https://code.google.com/p/shuffle-db-ng/), improved by
-nims11 and NicoHood. Licensed under the GPL, version 2 ([COPYING](COPYING)).
+Shuffler grew out of [IPod-Shuffle-4g](https://github.com/nims11/IPod-Shuffle-4g), a Python script
+by Nimesh Ghelani, NicoHood and contributors, which was based on
+[shuffle-db-ng](https://code.google.com/p/shuffle-db-ng/) by ikelos. Shuffler is written anew in
+Swift; their work and the format descriptions below showed the way.
 
 - [shuffle3db specification](docs/iTunesSD3gen.md) and [iTunesStats](docs/iTunesStats3gen.md)
   (copies of the vanished wiki; [original via the Wayback Machine](https://web.archive.org/web/20131016014401/http://shuffle3db.wikispaces.com/iTunesSD3gen))

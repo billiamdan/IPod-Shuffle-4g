@@ -1,3 +1,6 @@
+// SPDX-FileCopyrightText: 2026 billiamdan
+// SPDX-License-Identifier: GPL-2.0-or-later
+
 import Foundation
 
 /// What the iPod recorded for one track since the last sync. Apple's library file keeps running

@@ -18,6 +18,13 @@ This changlog uses the [ISO 8601 date format](https://www.iso.org/iso-8601-date-
   iPod's songs matches what is on it; `shufflectl sync` and `check` cover it from the terminal
 * `scripts/build-app.sh` to build the app bundle and a disk image
 
+### Changed
+
+* The licence is stated as GPL-2.0-or-later, with a copyright line. Every source file carries an
+  SPDX header; the app's About window, `shufflectl` help and the disk image name the licence and
+  where the source is; the disk image includes the licence text. The copied wiki pages in `docs`
+  are marked as third-party material outside the project's licence
+
 ### Removed
 
 * The Python script `ipod-shuffle-4g.py` and the `extras` folder with its helper files for Linux.
